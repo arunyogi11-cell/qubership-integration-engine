@@ -53,7 +53,7 @@ public class ContextStorageService {
                 .expiresAt(Timestamp.from(Instant.now().plusSeconds(ttl)))
                 .updatedAt(Timestamp.from(Instant.now()))
                 .build();
-         contextStorageRepository.save(contextSystemRecords);
+        contextStorageRepository.save(contextSystemRecords);
         log.debug("Value stored successfully for contextKey: {}, contextServiceId: {}, contextId: {}", contextKey, contextServiceId, contextId);
     }
 
@@ -91,9 +91,9 @@ public class ContextStorageService {
     }
 
     public Map<String, String> getValue(String contextServiceId, String contextId, List<String> keys) {
-       Object jsonValue = contextStorageRepository.findByContextServiceIdAndContextId(contextServiceId, contextId)
-        .filter(record -> record.getExpiresAt().after(Timestamp.from(Instant.now())))
-        .map(ContextSystemRecords::getValue).orElse(null);
+        Object jsonValue = contextStorageRepository.findByContextServiceIdAndContextId(contextServiceId, contextId)
+                .filter(record -> record.getExpiresAt().after(Timestamp.from(Instant.now())))
+                .map(ContextSystemRecords::getValue).orElse(null);
         if (jsonValue != null) {
             try {
                 JsonNode jsonNode = new ObjectMapper().readTree(jsonValue.toString());
@@ -134,4 +134,3 @@ public class ContextStorageService {
     }
 
 }
-
