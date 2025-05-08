@@ -11,9 +11,10 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class ContextStorage {
-    private String sessionId;
+public class ContextData {
+    private long createdAt;
+    private long updatedAt;
     private Map<String, String> context;
-    private ContextInfo contextInfo;
+
 }
 
