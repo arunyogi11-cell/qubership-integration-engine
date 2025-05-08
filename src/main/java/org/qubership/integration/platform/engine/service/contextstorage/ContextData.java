@@ -31,4 +31,3 @@ public class ContextData {
     private Map<String, String> context;
 
 }
-

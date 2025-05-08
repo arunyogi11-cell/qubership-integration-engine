@@ -270,7 +270,6 @@ qip:
   idempotency:
     expired-records-cleanup-cron: ${IDEMPOTENCY_RECORDS_CLEANUP_CRON:0 */5 * ? * *}
 
-
 kubernetes:
   devmode: ${KUBE_DEV_MODE:false}
   cluster:
