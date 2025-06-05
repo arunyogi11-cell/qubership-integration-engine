@@ -274,7 +274,7 @@ qip:
     enabled: ${IDEMPOTENCY_ENABLED:false}
   context:
     storage:
-      enabled: true
+      enabled: ${CONTEXT_STORAGE_ENABLED:false}
 
 kubernetes:
   devmode: ${KUBE_DEV_MODE:false}
