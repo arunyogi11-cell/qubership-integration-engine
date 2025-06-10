@@ -1,22 +1,22 @@
 package org.qubership.integration.platform.engine.camel.processors;
 
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
 import org.qubership.integration.platform.engine.model.constants.CamelConstants;
-import org.qubership.integration.platform.engine.service.contextstorage.ContextData;
 import org.qubership.integration.platform.engine.service.contextstorage.ContextStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 
-import static org.qubership.integration.platform.engine.camel.CorrelationIdSetter.CORRELATION_ID;
+
 
 @Slf4j
 @Component
@@ -52,20 +52,15 @@ public class ContextStorageProcessor implements Processor {
     private final ContextStorageService contextStorageService;
 
 
-    private final ObjectMapper objectMapper;
-
     @Autowired
     public ContextStorageProcessor(
-            ContextStorageService contextStorageService,
-            ObjectMapper objectMapper
+            ContextStorageService contextStorageService
     ) {
         this.contextStorageService = contextStorageService;
-        this.objectMapper = objectMapper;
     }
 
     @Override
     public void process(Exchange exchange) throws Exception {
-        String sessionId = getContextSessionId(exchange);
         Operation operation = readEnumValue(exchange, PROPERTY_OPERATION, Operation.class);
         switch (operation) {
             case GET -> processGetValue(exchange);
@@ -75,33 +70,33 @@ public class ContextStorageProcessor implements Processor {
     }
 
     private void processGetValue(Exchange exchange) throws Exception {
-        String filter = exchange.getProperty(PROPERTY_KEYS, String.class);
+        List<String> contextKey = Optional.ofNullable(exchange.getProperty(PROPERTY_KEYS, String.class))
+                .map(value -> List.of(value.split(",")))
+                .orElse(List.of());
         Target target = readEnumValue(exchange, PROPERTY_TARGET, Target.class);
         String name = exchange.getProperty(PROPERTY_TARGET_NAME, String.class);
-        boolean unwrap = isSingleKey(filter) && exchange.getProperty(PROPERTY_UNWRAP, Boolean.class);
-        Duration connectTimeout = getConnectTimeout(exchange);
+        String generatedKey = createKey(exchange);
+        //boolean unwrap = isSingleKey(key) && exchange.getProperty(PROPERTY_UNWRAP, Boolean.class);
+        //Duration connectTimeout = getConnectTimeout(exchange);
+        List<String> value = contextStorageService.getValue(generatedKey, contextKey);
+        switch (target) {
+            case BODY -> exchange.getMessage().setBody(value);
+            case HEADER -> exchange.getMessage().setHeader(name, value);
+            case PROPERTY -> exchange.setProperty(name, value);
+        }
     }
 
     private void processSetValue(Exchange exchange) throws Exception {
-        String key = exchange.getProperty(PROPERTY_KEY, String.class);
-        String value = exchange.getProperty(PROPERTY_VALUE, String.class);
-        String redisKey = createKey(exchange);
-        String existingContext = isContextExits(redisKey);
-        ContextData contextData = existingContext != null ? objectMapper.readValue(existingContext, ContextData.class) : null;
-        String redisValue = objectMapper.writeValueAsString(createValue(key, value, contextData));
-        contextStorageService.storeValue(redisKey, redisValue);
+        String contextKey = exchange.getProperty(PROPERTY_KEY, String.class);
+        String contextValue = exchange.getProperty(PROPERTY_VALUE, String.class);
+        LocalDateTime ttl = LocalDateTime.ofEpochSecond(exchange.getProperty(PROPERTY_TTL, Long.class), 0, ZoneOffset.UTC);
+        String generatedKey = createKey(exchange);
+        contextStorageService.storeValue(contextKey, contextValue, generatedKey, ttl);
     }
 
     private void deleteSessionContext(Exchange exchange) throws Exception {
-        String redisKey = createKey(exchange);
-        contextStorageService.deleteValue(redisKey);
-    }
-
-    private static String getContextSessionId(Exchange exchange) {
-        boolean useCorrelationId = exchange.getProperty(PROPERTY_USE_CORRELATION_ID, Boolean.class);
-        return useCorrelationId
-                ? exchange.getProperty(CORRELATION_ID, String.class)
-                : exchange.getProperty(PROPERTY_SESSION_ID, String.class);
+        String generatedKey = createKey(exchange);
+        contextStorageService.deleteValue(generatedKey);
     }
 
     private static boolean isSingleKey(String filter) {
@@ -124,23 +119,6 @@ public class ContextStorageProcessor implements Processor {
         return CONTEXT + ":" + contextServiceId + ":" + contextId;
     }
 
-
-    private static ContextData createValue(String key, String value, ContextData existingContext) {
-        Map<String, String> updatedContext = existingContext != null && existingContext.getContext() != null
-                ? new HashMap<>(existingContext.getContext())
-                : new HashMap<>();
-        updatedContext.put(key, value);
-
-        return ContextData.builder()
-                .createdAt(existingContext != null ? existingContext.getCreatedAt() : System.currentTimeMillis() / 1000)
-                .updatedAt(System.currentTimeMillis() / 1000)
-                .context(updatedContext)
-                .build();
-    }
-
-    private String isContextExits(String redisKey) {
-        return contextStorageService.getValue(redisKey);
-    }
 
 }
 
