@@ -18,7 +18,6 @@ package org.qubership.integration.platform.engine.configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.camel.spi.IdempotentRepository;
-import org.qubership.integration.platform.engine.camel.context.storage.ContextStorageRepository;
 import org.qubership.integration.platform.engine.camel.idempotency.IdempotentRepositoryParameters;
 import org.qubership.integration.platform.engine.camel.idempotency.RedisIdempotentRepository;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
@@ -34,6 +33,7 @@ import java.util.function.Function;
 
 @AutoConfiguration
 @Import({org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration.class})
+@ConditionalOnProperty(value = "qip.idempotency.enabled", havingValue = "true", matchIfMissing = true)
 public class RedisAutoConfiguration {
     @Bean
     RedisTemplate<String, String> redisTemplate(
@@ -48,7 +48,6 @@ public class RedisAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(name = "idempotentRepositoryFactory")
-    @ConditionalOnProperty(value = "qip.idempotency.enabled", havingValue = "true", matchIfMissing = true)
     Function<IdempotentRepositoryParameters, IdempotentRepository> idempotentRepository(
         RedisTemplate<String, String> redisTemplate,
         ObjectMapper objectMapper
@@ -59,12 +58,4 @@ public class RedisAutoConfiguration {
             keyParameters
         );
     }
-
-    @Bean
-    @ConditionalOnMissingBean(name = "contextStorageRepositoryFactory")
-    @ConditionalOnProperty(value = "qip.context.storage.enabled", havingValue = "true", matchIfMissing = true)
-    ContextStorageRepository contextStorageRepositoryFact(RedisTemplate<String, String> redisTemplate, ObjectMapper objectMapper) {
-        return new ContextStorageRepository(redisTemplate, objectMapper);
-    }
-
 }
