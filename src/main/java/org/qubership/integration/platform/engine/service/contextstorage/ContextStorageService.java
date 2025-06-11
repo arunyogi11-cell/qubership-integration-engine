@@ -1,3 +1,19 @@
+/*
+ * Copyright 2024-2025 NetCracker Technology Corporation
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package org.qubership.integration.platform.engine.service.contextstorage;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -9,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,12 +44,12 @@ public class ContextStorageService {
         this.contextStorageRepository = contextStorageRepository;
     }
 
-    public void storeValue(String contextKey, String contextValue, String generatedKey, LocalDateTime ttl) {
+    public void storeValue(String contextKey, String contextValue, String generatedKey, long ttl) {
         ContextData existingContext = contextKeyExits(contextKey, contextValue, generatedKey);
         ContextStorage contextStorage = ContextStorage.builder()
                 .key(generatedKey)
                 .value(new ObjectMapper().convertValue(existingContext, JsonNode.class))
-                .validUntil(ttl.plusSeconds(Instant.now().getEpochSecond()))
+                .validUntil(LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC).plusSeconds(ttl))
                 .build();
         contextStorageRepository.save(contextStorage);
     }
@@ -47,14 +64,12 @@ public class ContextStorageService {
                         contextNode.fields().forEachRemaining(entry ->
                                 updatedContext.put(entry.getKey(), entry.getKey().equals(contextKey) ? contextValue : entry.getValue().asText())
                         );
-                        if (!updatedContext.containsKey(contextKey)) {
-                            updatedContext.put(contextKey, contextValue);
-                        }
+                        updatedContext.putIfAbsent(contextKey, contextValue);
                     } else {
                         updatedContext.put(contextKey, contextValue);
                     }
                     return ContextData.builder()
-                            .createdAt(existingContext.has(CREATED_AT) ? existingContext.get(CREATED_AT).asLong() : Instant.now().getEpochSecond())
+                            .createdAt(existingContext != null && existingContext.has(CREATED_AT) ? existingContext.get(CREATED_AT).asLong() : Instant.now().getEpochSecond())
                             .updatedAt(Instant.now().getEpochSecond())
                             .context(updatedContext)
                             .build();
