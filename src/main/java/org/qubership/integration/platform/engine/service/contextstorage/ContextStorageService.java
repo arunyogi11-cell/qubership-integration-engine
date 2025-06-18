@@ -16,100 +16,103 @@
 
 package org.qubership.integration.platform.engine.service.contextstorage;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.qubership.integration.platform.engine.persistence.shared.entity.ContextStorage;
+import lombok.extern.slf4j.Slf4j;
+import org.qubership.integration.platform.engine.persistence.shared.entity.ContextSystemRecords;
 import org.qubership.integration.platform.engine.persistence.shared.repository.ContextStorageRespository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 public class ContextStorageService {
     private final ContextStorageRespository contextStorageRepository;
     private static final String CONTEXT = "context";
 
-    private static final String CREATED_AT = "createdAt";
-
     @Autowired
-    public ContextStorageService(
-            ContextStorageRespository contextStorageRepository
-    ) {
+    public ContextStorageService(ContextStorageRespository contextStorageRepository) {
         this.contextStorageRepository = contextStorageRepository;
     }
 
-    public void storeValue(String contextKey, String contextValue, String generatedKey, long ttl) {
-        ContextData existingContext = contextKeyExits(contextKey, contextValue, generatedKey);
-        ContextStorage contextStorage = ContextStorage.builder()
-                .key(generatedKey)
+    public void storeValue(String contextKey, String contextValue, String contextServiceId, String contextId, long ttl) {
+        Optional<ContextSystemRecords> oldRecord = contextStorageRepository.findByContextServiceIdAndContextId(contextServiceId, contextId);
+        ContextData existingContext = contextKeyExits(contextKey, contextValue, contextServiceId, contextId);
+        ContextSystemRecords contextSystemRecords = ContextSystemRecords.builder()
+                .id(oldRecord.isPresent() ? oldRecord.get().getId() : UUID.randomUUID().toString())
                 .value(new ObjectMapper().convertValue(existingContext, JsonNode.class))
-                .validUntil(LocalDateTime.ofInstant(Instant.now(), ZoneOffset.UTC).plusSeconds(ttl))
+                .contextServiceId(contextServiceId)
+                .contextId(contextId)
+                .createdAt(oldRecord.isPresent() ? oldRecord.get().getCreatedAt() : Timestamp.from(Instant.now()))
+                .expiresAt(oldRecord.isPresent() ? Timestamp.from(oldRecord.get().getExpiresAt().toInstant().plusSeconds(ttl)) : Timestamp.from(Instant.now().plusSeconds(ttl)))
+                .updatedAt(Timestamp.from(Instant.now()))
                 .build();
-        contextStorageRepository.save(contextStorage);
+         contextStorageRepository.save(contextSystemRecords);
+        log.info("Value stored successfully for contextKey: {}, contextServiceId: {}, contextId: {}", contextKey, contextServiceId, contextId);
     }
 
-    private ContextData contextKeyExits(String contextKey, String contextValue, String generatedKey) {
-        return contextStorageRepository.findById(generatedKey)
-                .map(existingStorage -> {
-                    JsonNode existingContext = existingStorage.getValue();
-                    Map<String, String> updatedContext = new HashMap<>();
-                    if (existingContext != null) {
-                        JsonNode contextNode = existingContext.get(CONTEXT);
-                        contextNode.fields().forEachRemaining(entry ->
-                                updatedContext.put(entry.getKey(), entry.getKey().equals(contextKey) ? contextValue : entry.getValue().asText())
-                        );
-                        updatedContext.putIfAbsent(contextKey, contextValue);
-                    } else {
-                        updatedContext.put(contextKey, contextValue);
-                    }
-                    return ContextData.builder()
-                            .createdAt(existingContext != null && existingContext.has(CREATED_AT) ? existingContext.get(CREATED_AT).asLong() : Instant.now().getEpochSecond())
-                            .updatedAt(Instant.now().getEpochSecond())
-                            .context(updatedContext)
-                            .build();
-                })
-                .orElseGet(() -> createNewContext(contextKey, contextValue));
+    private ContextData contextKeyExits(String contextKey, String contextValue, String contextServiceId, String contextId) {
+        try {
+            return contextStorageRepository.findByContextServiceIdAndContextId(contextServiceId, contextId).map(existingStorage -> {
+                JsonNode existingContext = existingStorage.getValue();
+                Map<String, String> updatedContext = new HashMap<>();
+                if (existingContext != null) {
+                    log.debug("Updating existing context for contextKey: {}", contextKey);
+                    JsonNode contextNode = existingContext.get(CONTEXT);
+                    contextNode.fields().forEachRemaining(entry -> updatedContext.put(entry.getKey(), entry.getKey().equals(contextKey) ? contextValue : entry.getValue().asText()));
+                    updatedContext.putIfAbsent(contextKey, contextValue);
+                } else {
+                    log.debug("No existing context found, creating new context for contextKey: {}", contextKey);
+                    updatedContext.put(contextKey, contextValue);
+                }
+                return ContextData.builder().context(updatedContext).build();
+            }).orElseGet(() -> {
+                log.debug("No existing storage found, creating new context for contextKey: {}", contextKey);
+                return createNewContext(contextKey, contextValue);
+            });
+        } catch (Exception e) {
+            log.error("Error occurred while processing contextKey: {}, contextServiceId: {}, contextId: {}", contextKey, contextServiceId, contextId, e);
+            throw e;
+        }
     }
+
 
     private static ContextData createNewContext(String key, String value) {
         Map<String, String> updatedContext = new HashMap<>();
         updatedContext.put(key, value);
-        return ContextData.builder()
-                .createdAt(Instant.now().getEpochSecond())
-                .updatedAt(Instant.now().getEpochSecond())
-                .context(updatedContext)
-                .build();
+        return ContextData.builder().context(updatedContext).build();
     }
 
-    public List<String> getValue(String generatedKey, List<String> keys) {
-        Object jsonValue = contextStorageRepository.findById(generatedKey)
-                .map(ContextStorage::getValue)
-                .orElse(null);
+    public Map<String, String> getValue(String contextServiceId, String contextId, List<String> keys) {
+        Object jsonValue = contextStorageRepository.findByContextServiceIdAndContextId(contextServiceId, contextId).map(ContextSystemRecords::getValue).orElse(null);
 
         if (jsonValue != null) {
             try {
                 JsonNode jsonNode = new ObjectMapper().readTree(jsonValue.toString());
                 JsonNode contextNode = jsonNode.get(CONTEXT);
-                if (contextNode != null) {
-                    return keys.stream()
-                            .map(key -> contextNode.has(key) ? contextNode.get(key).asText() : null)
-                            .toList();
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
+                return keys.stream().filter(contextNode::has).collect(Collectors.toMap(key -> key, key -> contextNode.get(key).asText()));
+            } catch (JsonProcessingException e) {
+                log.error("Error occurred while processing JSON for contextServiceId: {}, contextId: {}", contextServiceId, contextId, e);
+                throw new RuntimeException(e);
             }
         }
+        log.error("Context keys: {}  with contextServiceId: {}, contextId: {} not found", keys, contextServiceId, contextId);
         return null;
     }
 
-    public void deleteValue(String generatedKey) {
-        contextStorageRepository.deleteById(generatedKey);
+    public void deleteValue(String contextServiceID, String contextId) {
+        try {
+            contextStorageRepository.deleteRecordByContextServiceIdAndContextId(contextServiceID, contextId);
+        } catch (Exception e) {
+            log.error("Error occurred while deleting value for contextServiceID: {}, contextId: {}", contextServiceID, contextId, e);
+            throw e;
+        }
     }
 
 }
