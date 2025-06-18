@@ -16,8 +16,6 @@
 
 package org.qubership.integration.platform.engine.camel.processors;
 
-
-
 import lombok.extern.slf4j.Slf4j;
 import org.apache.camel.Exchange;
 import org.apache.camel.Processor;
@@ -26,10 +24,11 @@ import org.qubership.integration.platform.engine.service.contextstorage.ContextS
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
-import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
+import static org.qubership.integration.platform.engine.camel.CorrelationIdSetter.CORRELATION_ID;
 
 
 @Slf4j
@@ -62,7 +61,6 @@ public class ContextStorageProcessor implements Processor {
     private static final String PROPERTY_TARGET_NAME = SESSION_CONTEXT_PROPERTY_PREFIX + "targetName";
     private static final String PROPERTY_UNWRAP = SESSION_CONTEXT_PROPERTY_PREFIX + "unwrap";
     private static final String PROPERTY_CONNECT_TIMEOUT = SESSION_CONTEXT_PROPERTY_PREFIX + "connectTimeout";
-
     private final ContextStorageService contextStorageService;
 
 
@@ -75,46 +73,47 @@ public class ContextStorageProcessor implements Processor {
 
     @Override
     public void process(Exchange exchange) throws Exception {
+        String sessionId = getContextSessionId(exchange);
         Operation operation = readEnumValue(exchange, PROPERTY_OPERATION, Operation.class);
         switch (operation) {
-            case GET -> processGetValue(exchange);
-            case SET -> processSetValue(exchange);
-            case DELETE -> deleteSessionContext(exchange);
+            case GET -> processGetValue(exchange, sessionId);
+            case SET -> processSetValue(exchange, sessionId);
+            case DELETE -> deleteContext(exchange, sessionId);
         }
     }
 
-    private void processGetValue(Exchange exchange) throws Exception {
+    private void processGetValue(Exchange exchange, String sessionId) throws Exception {
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
         List<String> contextKey = Optional.ofNullable(exchange.getProperty(PROPERTY_KEYS, String.class))
                 .map(value -> List.of(value.split(",")))
                 .orElse(List.of());
         Target target = readEnumValue(exchange, PROPERTY_TARGET, Target.class);
         String name = exchange.getProperty(PROPERTY_TARGET_NAME, String.class);
-        String generatedKey = createKey(exchange);
-        //boolean unwrap = isSingleKey(key) && exchange.getProperty(PROPERTY_UNWRAP, Boolean.class);
-        //Duration connectTimeout = getConnectTimeout(exchange);
-        List<String> value = contextStorageService.getValue(generatedKey, contextKey);
+        boolean unwrap = (!exchange.getProperty(PROPERTY_UNWRAP).toString().isEmpty())
+                ? exchange.getProperty(PROPERTY_UNWRAP, Boolean.class)
+                : false;
+        Map<String, String> map = contextStorageService.getValue(contextServiceId, contextId, contextKey);
         switch (target) {
-            case BODY -> exchange.getMessage().setBody(value);
-            case HEADER -> exchange.getMessage().setHeader(name, value);
-            case PROPERTY -> exchange.setProperty(name, value);
+            case BODY -> exchange.getMessage().setBody(unwrap ? map.values().stream().findFirst().orElse(null) : map);
+            case HEADER -> exchange.getMessage().setHeader(name, unwrap ? map.values().stream().findFirst().orElse(null) : map);
+            case PROPERTY -> exchange.setProperty(name, unwrap ? map.values().stream().findFirst().orElse(null) : map);
         }
     }
 
-    private void processSetValue(Exchange exchange) throws Exception {
+    private void processSetValue(Exchange exchange, String sessionId) throws Exception {
         String contextKey = exchange.getProperty(PROPERTY_KEY, String.class);
         String contextValue = exchange.getProperty(PROPERTY_VALUE, String.class);
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
         long ttl = exchange.getProperty(PROPERTY_TTL, Long.class);
-        String generatedKey = createKey(exchange);
-        contextStorageService.storeValue(contextKey, contextValue, generatedKey, ttl);
+        contextStorageService.storeValue(contextKey, contextValue, contextServiceId, contextId, ttl);
     }
 
-    private void deleteSessionContext(Exchange exchange) throws Exception {
-        String generatedKey = createKey(exchange);
-        contextStorageService.deleteValue(generatedKey);
-    }
-
-    private static boolean isSingleKey(String filter) {
-        return !filter.contains(",");
+    private void deleteContext(Exchange exchange, String sessionId) throws Exception {
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
+        contextStorageService.deleteValue(contextServiceId, contextId);
     }
 
     private static <T extends Enum<T>> T readEnumValue(Exchange exchange, String propertyName, Class<T> cls) {
@@ -123,15 +122,14 @@ public class ContextStorageProcessor implements Processor {
                 .orElse(null);
     }
 
-    private static Duration getConnectTimeout(Exchange exchange) {
-        return Duration.ofMillis(exchange.getProperty(PROPERTY_CONNECT_TIMEOUT, 120000, Long.class));
+    private static String getContextSessionId(Exchange exchange) {
+        boolean useCorrelationId = exchange.getProperty(PROPERTY_USE_CORRELATION_ID, Boolean.class);
+        return useCorrelationId
+                ? exchange.getProperty(CORRELATION_ID, String.class)
+                : exchange.getProperty(PROPERTY_SESSION_ID, String.class);
     }
 
-    private static String createKey(Exchange exchange) {
-        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
-        String contextId = exchange.getProperty(PROPERTY_SESSION_ID, String.class);
-        return CONTEXT + ":" + contextServiceId + ":" + contextId;
-    }
+
 
 
 }

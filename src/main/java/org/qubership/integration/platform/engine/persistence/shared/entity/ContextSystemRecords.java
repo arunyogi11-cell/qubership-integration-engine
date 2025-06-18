@@ -22,26 +22,42 @@ import io.hypersistence.utils.hibernate.type.json.JsonBinaryType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.*;
 import org.hibernate.annotations.Type;
 
-import java.time.LocalDateTime;
+import java.sql.Timestamp;
+import java.util.UUID;
 
 @Getter
 @Setter
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Entity(name = "context_storage")
-public class ContextStorage {
+@Entity(name = "context_system_records")
+@Table(uniqueConstraints = @jakarta.persistence.UniqueConstraint(columnNames = {"context_service_id", "context_id"}))
+public class ContextSystemRecords {
 
     @Id
-    private String key;
+    @Builder.Default
+    private String id = UUID.randomUUID().toString();
 
     @Type(JsonBinaryType.class)
     @Column(columnDefinition = "jsonb")
     private JsonNode value;
 
-    private LocalDateTime validUntil;
+    @Column(name = "context_service_id")
+    private String contextServiceId;
 
+    @Column(name = "context_id")
+    private String contextId;
+
+    @Column(name = "expires_at")
+    private Timestamp expiresAt;
+
+    @Column(name = "created_at")
+    private Timestamp createdAt;
+
+    @Column(name = "updated_at")
+    private Timestamp updatedAt;
 }

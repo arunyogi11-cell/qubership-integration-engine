@@ -16,9 +16,23 @@
 
 package org.qubership.integration.platform.engine.persistence.shared.repository;
 
-import org.qubership.integration.platform.engine.persistence.shared.entity.ContextStorage;
+import jakarta.transaction.Transactional;
+import org.qubership.integration.platform.engine.persistence.shared.entity.ContextSystemRecords;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-public interface ContextStorageRespository extends JpaRepository<ContextStorage, String> {
-    // Define any additional query methods if needed
+import java.util.Optional;
+
+public interface ContextStorageRespository extends JpaRepository<ContextSystemRecords, String> {
+    Optional<ContextSystemRecords> findByContextServiceIdAndContextId(String contextServiceId, String contextId);
+
+    @Modifying
+    @Transactional
+    @Query(
+            nativeQuery = true,
+            value =  "DELETE FROM engine.context_system_records record"
+            + " WHERE record.context_service_id = :contextServiceId AND record.context_Id = :contextId")
+    void deleteRecordByContextServiceIdAndContextId(@Param("contextServiceId") String contextServiceId, @Param("contextId") String contextId);
 }

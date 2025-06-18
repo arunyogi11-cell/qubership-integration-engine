@@ -28,8 +28,6 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 public class ContextData {
-    private long createdAt;
-    private long updatedAt;
     private Map<String, String> context;
 
 }
