@@ -47,11 +47,11 @@ public class ContextStorageProcessor implements Processor {
         BODY
     }
 
-    private static final String SESSION_CONTEXT_PROPERTY_PREFIX = CamelConstants.INTERNAL_PROPERTY_PREFIX + "sessionContext_";
+    private static final String SESSION_CONTEXT_PROPERTY_PREFIX = CamelConstants.INTERNAL_PROPERTY_PREFIX + "contextStorage_";
     private static final String PROPERTY_USE_CORRELATION_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "useCorrelationId";
-    private static final String PROPERTY_SESSION_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "sessionId";
+    private static final String PROPERTY_CONTEXT_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "contextId";
     private static final String CONTEXT = "context";
-    private static final String PROPERTY_CONTEXT_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "context";
+    private static final String PROPERTY_CONTEXT_SERVICE_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "contextServiceId";
     private static final String PROPERTY_OPERATION = SESSION_CONTEXT_PROPERTY_PREFIX + "operation";
     private static final String PROPERTY_KEY = SESSION_CONTEXT_PROPERTY_PREFIX + "key";
     private static final String PROPERTY_VALUE = SESSION_CONTEXT_PROPERTY_PREFIX + "value";
@@ -60,7 +60,6 @@ public class ContextStorageProcessor implements Processor {
     private static final String PROPERTY_TARGET = SESSION_CONTEXT_PROPERTY_PREFIX + "target";
     private static final String PROPERTY_TARGET_NAME = SESSION_CONTEXT_PROPERTY_PREFIX + "targetName";
     private static final String PROPERTY_UNWRAP = SESSION_CONTEXT_PROPERTY_PREFIX + "unwrap";
-    private static final String PROPERTY_CONNECT_TIMEOUT = SESSION_CONTEXT_PROPERTY_PREFIX + "connectTimeout";
     private final ContextStorageService contextStorageService;
 
 
@@ -83,8 +82,8 @@ public class ContextStorageProcessor implements Processor {
     }
 
     private void processGetValue(Exchange exchange, String sessionId) throws Exception {
-        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
-        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_SERVICE_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_CONTEXT_ID, String.class)).orElse(sessionId);
         List<String> contextKey = Optional.ofNullable(exchange.getProperty(PROPERTY_KEYS, String.class))
                 .map(value -> List.of(value.split(",")))
                 .orElse(List.of());
@@ -104,15 +103,15 @@ public class ContextStorageProcessor implements Processor {
     private void processSetValue(Exchange exchange, String sessionId) throws Exception {
         String contextKey = exchange.getProperty(PROPERTY_KEY, String.class);
         String contextValue = exchange.getProperty(PROPERTY_VALUE, String.class);
-        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
-        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_SERVICE_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_CONTEXT_ID, String.class)).orElse(sessionId);
         long ttl = exchange.getProperty(PROPERTY_TTL, Long.class);
         contextStorageService.storeValue(contextKey, contextValue, contextServiceId, contextId, ttl);
     }
 
     private void deleteContext(Exchange exchange, String sessionId) throws Exception {
-        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
-        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_SESSION_ID, String.class)).orElse(sessionId);
+        String contextServiceId = exchange.getProperty(PROPERTY_CONTEXT_SERVICE_ID, String.class);
+        String contextId = Optional.ofNullable(exchange.getProperty(PROPERTY_CONTEXT_ID, String.class)).orElse(sessionId);
         contextStorageService.deleteValue(contextServiceId, contextId);
     }
 
@@ -126,7 +125,7 @@ public class ContextStorageProcessor implements Processor {
         boolean useCorrelationId = exchange.getProperty(PROPERTY_USE_CORRELATION_ID, Boolean.class);
         return useCorrelationId
                 ? exchange.getProperty(CORRELATION_ID, String.class)
-                : exchange.getProperty(PROPERTY_SESSION_ID, String.class);
+                : exchange.getProperty(PROPERTY_CONTEXT_ID, String.class);
     }
 
 
