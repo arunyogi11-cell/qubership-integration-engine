@@ -23,6 +23,8 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.sql.Timestamp;
+import java.util.List;
 import java.util.Optional;
 
 public interface ContextStorageRespository extends JpaRepository<ContextSystemRecords, String> {
@@ -32,7 +34,10 @@ public interface ContextStorageRespository extends JpaRepository<ContextSystemRe
     @Transactional
     @Query(
             nativeQuery = true,
-            value =  "DELETE FROM engine.context_system_records record"
-            + " WHERE record.context_service_id = :contextServiceId AND record.context_Id = :contextId")
+            value = "DELETE FROM engine.context_system_records record"
+                    + " WHERE record.context_service_id = :contextServiceId AND record.context_Id = :contextId")
     void deleteRecordByContextServiceIdAndContextId(@Param("contextServiceId") String contextServiceId, @Param("contextId") String contextId);
+
+    @Transactional
+    List<ContextSystemRecords> findAllByExpiresAtBefore(Timestamp expiresAt);
 }

@@ -115,5 +115,20 @@ public class ContextStorageService {
         }
     }
 
+    public void deleteOldRecords() {
+        try {
+            List<ContextSystemRecords> oldRecords  = contextStorageRepository.findAllByExpiresAtBefore(Timestamp.from(Instant.now()));
+            if (oldRecords != null && !oldRecords.isEmpty()) {
+                contextStorageRepository.deleteAll(oldRecords);
+                log.debug("Deleted old records from context storage");
+            } else {
+                log.debug("No old records found to delete");
+            }
+        } catch (Exception e) {
+            log.error("Error occurred while deleting old records from context storage", e);
+            throw e;
+        }
+    }
+
 }
 
