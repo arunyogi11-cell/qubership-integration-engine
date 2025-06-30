@@ -50,7 +50,6 @@ public class ContextStorageProcessor implements Processor {
     private static final String SESSION_CONTEXT_PROPERTY_PREFIX = CamelConstants.INTERNAL_PROPERTY_PREFIX + "contextStorage_";
     private static final String PROPERTY_USE_CORRELATION_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "useCorrelationId";
     private static final String PROPERTY_CONTEXT_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "contextId";
-    private static final String CONTEXT = "context";
     private static final String PROPERTY_CONTEXT_SERVICE_ID = SESSION_CONTEXT_PROPERTY_PREFIX + "contextServiceId";
     private static final String PROPERTY_OPERATION = SESSION_CONTEXT_PROPERTY_PREFIX + "operation";
     private static final String PROPERTY_KEY = SESSION_CONTEXT_PROPERTY_PREFIX + "key";
