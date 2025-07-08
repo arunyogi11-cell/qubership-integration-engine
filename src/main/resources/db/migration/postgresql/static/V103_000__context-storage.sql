@@ -15,15 +15,15 @@
 
 create table IF NOT EXISTS context_system_records
 (
-    id                 varchar(255) not null
+    id                 TEXT not null
     constraint pk_context_system_recods
     primary key,
     value              JSONB,
-    context_id         varchar(225),
-    context_service_id varchar(255),
-    created_at         TIMESTAMP,
-    updated_at         TIMESTAMP,
-    expires_at         TIMESTAMP
+    context_id         TEXT,
+    context_service_id TEXT,
+    created_at         TIMESTAMPTZ,
+    updated_at         TIMESTAMPTZ,
+    expires_at         TIMESTAMPTZ
     );
 
 alter table context_system_records
