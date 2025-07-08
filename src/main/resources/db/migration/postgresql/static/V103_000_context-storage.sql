@@ -19,7 +19,6 @@ create table IF NOT EXISTS context_system_records
     constraint pk_context_system_recods
     primary key,
     value              JSONB,
-    type               varchar(255),
     context_id         varchar(225),
     context_service_id varchar(255),
     created_at         TIMESTAMP,
