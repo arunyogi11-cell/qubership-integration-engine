@@ -21,7 +21,8 @@ import org.qubership.integration.platform.engine.persistence.shared.entity.Conte
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.quimport org.springframework.stereotype.Repository;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
 import java.util.List;
@@ -30,8 +31,6 @@ import java.util.Optional;
 @Repository
 public interface ContextStorageRespository extends JpaRepository<ContextSystemRecords, String> {
     Optional<ContextSystemRecords> findByContextServiceIdAndContextId(String contextServiceId, String contextId);
-
-    Optional<ContextSystemRecords> findByContextServiceIdAndContextIdAndExpiresAtLessThan(String contextServiceId, String contextId, Timestamp now);
 
     @Modifying
     @Transactional
