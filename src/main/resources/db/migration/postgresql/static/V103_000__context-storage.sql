@@ -19,9 +19,13 @@ create table IF NOT EXISTS context_system_records
     constraint pk_context_system_recods
     primary key,
     value              JSONB,
-    context_id         TEXT,
+    context_id         TEXT ,
     context_service_id TEXT,
     created_at         TIMESTAMPTZ,
     updated_at         TIMESTAMPTZ,
     expires_at         TIMESTAMPTZ
     );
+
+
+create index IF NOT EXISTS idx_context_service_id_context_id
+    on context_system_records (context_service_id, context_id);
