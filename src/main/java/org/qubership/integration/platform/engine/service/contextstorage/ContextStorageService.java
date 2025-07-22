@@ -104,7 +104,7 @@ public class ContextStorageService {
                 throw new RuntimeException(e);
             }
         }
-        log.error("Context keys: {}  with contextServiceId: {}, contextId: {} is either not present or expired", keys, contextServiceId, contextId);
+        log.warn("Context keys: {}  with contextServiceId: {}, contextId: {} is either not present or expired", keys, contextServiceId, contextId);
         return null;
     }
 
