@@ -117,7 +117,7 @@ public class TasksScheduler {
     @Scheduled(cron = "${qip.context-service.cleanup.cron}")
     public void cleanupContextStorage() {
         contextStorageService.deleteOldRecords();
-        log.info("Scheduled cleanup completed");
+        log.info("Scheduled context record cleanup completed");
     }
 
     @Scheduled(fixedRate = ConsulService.SESSION_RENEW_DELAY)

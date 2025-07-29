@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.qubership.integration.platform.engine.errorhandling.ContextStorageException;
 import org.qubership.integration.platform.engine.persistence.shared.entity.ContextSystemRecords;
 import org.qubership.integration.platform.engine.persistence.shared.repository.ContextStorageRespository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,8 +34,12 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class ContextStorageService {
-    private final ContextStorageRespository contextStorageRepository;
+
     private static final String CONTEXT = "context";
+    private final ContextStorageRespository contextStorageRepository;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
     @Autowired
     public ContextStorageService(ContextStorageRespository contextStorageRepository) {
@@ -46,7 +51,7 @@ public class ContextStorageService {
         ContextData existingContext = contextKeyExits(contextKey, contextValue, contextServiceId, contextId);
         ContextSystemRecords contextSystemRecords = ContextSystemRecords.builder()
                 .id(oldRecord.isPresent() ? oldRecord.get().getId() : UUID.randomUUID().toString())
-                .value(new ObjectMapper().convertValue(existingContext, JsonNode.class))
+                .value(objectMapper.convertValue(existingContext, JsonNode.class))
                 .contextServiceId(contextServiceId)
                 .contextId(contextId)
                 .createdAt(oldRecord.isPresent() ? oldRecord.get().getCreatedAt() : Timestamp.from(Instant.now()))
@@ -77,13 +82,13 @@ public class ContextStorageService {
                 return createNewContext(contextKey, contextValue);
             });
         } catch (Exception e) {
-            log.error("Error occurred while processing contextKey: {}, contextServiceId: {}, contextId: {}", contextKey, contextServiceId, contextId, e);
-            throw e;
+            throw new ContextStorageException("Error occurred while processing contextKey: " + contextKey + " contextServiceId: " + contextServiceId + " contextId: " + contextId);
+
         }
     }
 
 
-    private static ContextData createNewContext(String key, String value) {
+    private ContextData createNewContext(String key, String value) {
         Map<String, String> updatedContext = new HashMap<>();
         updatedContext.put(key, value);
         log.info("Creating new context with key: {} and value: {}", key, value);
@@ -96,7 +101,7 @@ public class ContextStorageService {
                 .map(ContextSystemRecords::getValue).orElse(null);
         if (jsonValue != null) {
             try {
-                JsonNode jsonNode = new ObjectMapper().readTree(jsonValue.toString());
+                JsonNode jsonNode = objectMapper.readTree(jsonValue.toString());
                 JsonNode contextNode = jsonNode.get(CONTEXT);
                 return keys.stream().filter(contextNode::has).collect(Collectors.toMap(key -> key, key -> contextNode.get(key).asText()));
             } catch (JsonProcessingException e) {
@@ -105,7 +110,7 @@ public class ContextStorageService {
             }
         }
         log.warn("Context keys: {}  with contextServiceId: {}, contextId: {} is either not present or expired", keys, contextServiceId, contextId);
-        return null;
+        return Collections.emptyMap();
     }
 
     public void deleteValue(String contextServiceID, String contextId) {
@@ -113,8 +118,7 @@ public class ContextStorageService {
             contextStorageRepository.deleteRecordByContextServiceIdAndContextId(contextServiceID, contextId);
             log.info("Value deleted successfully for contextServiceID: {}, contextId: {}", contextServiceID, contextId);
         } catch (Exception e) {
-            log.error("Error occurred while deleting value for contextServiceID: {}, contextId: {}", contextServiceID, contextId, e);
-            throw e;
+            throw new ContextStorageException("Error occurred while deleting value for contextServiceID: " + contextServiceID + " contextId: " + contextId);
         }
     }
 
@@ -128,8 +132,7 @@ public class ContextStorageService {
                 log.debug("No old records found to delete");
             }
         } catch (Exception e) {
-            log.error("Error occurred while deleting old records from context storage", e);
-            throw e;
+            throw new ContextStorageException("Error occurred while deleting old records from context storage");
         }
     }
 
